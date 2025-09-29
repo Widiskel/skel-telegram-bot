@@ -62,6 +62,12 @@ async def handle_webhook(request: Request) -> Response:
     return Response(status_code=200)
 
 
+@app.get("/webhook")
+async def webhook_ready() -> dict[str, str]:
+    await _ensure_app()
+    return {"status": "ready"}
+
+
 @app.get("/health")
 async def health_check() -> dict[str, str]:
     return {"status": "ok"}
