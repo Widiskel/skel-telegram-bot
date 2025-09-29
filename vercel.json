@@ -8,6 +8,11 @@
       }
     }
   ],
+  "build": {
+    "env": {
+      "PYTHONPATH": "${PYTHONPATH}:src"
+    }
+  },
   "routes": [
     {
       "src": "/webhook",
