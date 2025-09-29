@@ -1,0 +1,6 @@
+httpx==0.26.0
+loguru==0.7.3
+python-dotenv==1.1.1
+python-telegram-bot==20.8
+python-ulid==3.0.0
+fastapi==0.115.12

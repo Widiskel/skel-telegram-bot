@@ -1,0 +1,3 @@
+[submodule "agent/skel-crypto-agent"]
+	path = agent/skel-crypto-agent
+	url = https://github.com/Widiskel/skel-crypto-agent.git

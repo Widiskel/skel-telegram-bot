@@ -1,0 +1,21 @@
+{
+  "builds": [
+    {
+      "src": "main-vercel.py",
+      "use": "@vercel/python",
+      "config": {
+        "runtime": "python3.12"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/webhook",
+      "dest": "main-vercel.py"
+    },
+    {
+      "src": "/health",
+      "dest": "main-vercel.py"
+    }
+  ]
+}
