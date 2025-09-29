@@ -8,18 +8,9 @@
       }
     }
   ],
-  "build": {
-    "env": {
-      "PYTHONPATH": "${PYTHONPATH}:src"
-    }
-  },
   "routes": [
     {
-      "src": "/webhook",
-      "dest": "main-vercel.py"
-    },
-    {
-      "src": "/health",
+      "src": "/(.*)",
       "dest": "main-vercel.py"
     }
   ]
