@@ -2,6 +2,8 @@ import asyncio
 import os
 import sys
 from pathlib import Path
+from typing import Dict
+from weakref import WeakKeyDictionary
 
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse
@@ -14,8 +16,12 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "src"
 from skel_telegram_bot.bot import build_application
 
 app = FastAPI()
-telegram_app: Application | None = None
-startup_lock = asyncio.Lock()
+
+# Maintain an Application per running event loop so Vercel's request-scoped
+# loops don't reuse clients tied to a closed loop.
+_apps_by_loop: WeakKeyDictionary[asyncio.AbstractEventLoop, Application] = WeakKeyDictionary()
+_locks_by_loop: WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Lock] = WeakKeyDictionary()
+_webhook_registered: Dict[int, bool] = {}
 favicon_dir = Path(__file__).resolve().parent / "favicon"
 if favicon_dir.exists():
     app.mount("/favicon", StaticFiles(directory=str(favicon_dir)), name="favicon")
@@ -29,28 +35,48 @@ if favicon_dir.exists():
 
 
 async def _ensure_app() -> Application:
-    global telegram_app
-    if telegram_app:
-        return telegram_app
-    async with startup_lock:
-        if telegram_app:
-            return telegram_app
-        telegram_app = build_application()
-        await telegram_app.initialize()
-        await telegram_app.start()
+    loop = asyncio.get_running_loop()
+    app = _apps_by_loop.get(loop)
+    if app:
+        return app
+
+    lock = _locks_by_loop.get(loop)
+    if lock is None:
+        lock = asyncio.Lock()
+        _locks_by_loop[loop] = lock
+
+    async with lock:
+        app = _apps_by_loop.get(loop)
+        if app:
+            return app
+
+        app = build_application()
+        await app.initialize()
+        await app.start()
+
         webhook_url = os.getenv("WEBHOOK_URL")
         if webhook_url:
-            await telegram_app.bot.set_webhook(webhook_url, drop_pending_updates=True)
-        return telegram_app
+            key = id(app.bot)
+            if not _webhook_registered.get(key):
+                await app.bot.set_webhook(webhook_url, drop_pending_updates=True)
+                _webhook_registered[key] = True
+
+        _apps_by_loop[loop] = app
+        return app
 
 
 @app.on_event("shutdown")
 async def shutdown_event() -> None:
-    global telegram_app
-    if telegram_app:
-        await telegram_app.stop()
-        await telegram_app.shutdown()
-        telegram_app = None
+    apps = list(_apps_by_loop.values())
+    _apps_by_loop.clear()
+    _locks_by_loop.clear()
+    _webhook_registered.clear()
+
+    for application in apps:
+        try:
+            await application.stop()
+        finally:
+            await application.shutdown()
 
 
 @app.post("/webhook")
